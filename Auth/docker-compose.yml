@@ -1,0 +1,10 @@
+services:
+  auth-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"  # Mapeia a porta do host para o container
+
+volumes:
+  db_data:  # Volume persistente para o banco de dados
