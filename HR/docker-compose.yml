@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hr_db
+    ports:
+      - "5432:5432"  # Porta do PostgreSQL
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  hr-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"  # Mapeia a porta do host para o container
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/hr_db
+    depends_on:
+      - db
+
+volumes:
+  db_data:  # Volume persistente para o banco de dados
