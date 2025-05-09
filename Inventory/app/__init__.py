@@ -14,8 +14,8 @@ def create_app():
     app.config.from_pyfile('../config.py')
 
     with app.app_context():
-        reset_db(db)
         db.init_app(app)
+        reset_db(db)
 
         jwt.init_app(app)
         cors.init_app(app)

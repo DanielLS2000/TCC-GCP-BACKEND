@@ -53,7 +53,10 @@ def get_products():
 def get_product(product_id):
     product = Product.query.filter_by(id=product_id).first()
     
-    return jsonify(product.to_dict())
+    if product:
+        return jsonify(product.to_dict()), 200
+    else:
+        return jsonify({"error": "Product not found"}), 404
 
 @product_bp.route('/<int:product_id>/update', methods=['PUT'])
 def update_product(product_id):
