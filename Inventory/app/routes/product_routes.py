@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
-from models import Product, Category
+from app.models import Product, Category
 from app import db
 
-product_bp = Blueprint('products', __name__, url_prefix='/products')
+product_bp = Blueprint('products', __name__)
 
 @product_bp.route('/', methods=['POST'])
 def create_product():

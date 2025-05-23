@@ -2,8 +2,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from app.database import Base, reset_db
-import os
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -14,6 +12,8 @@ def create_app():
     app.config.from_pyfile('../config.py')
 
     with app.app_context():
+        # Resetar o banco de dados
+        from app.database import reset_db
         db.init_app(app)
         reset_db(db)
 
@@ -21,14 +21,14 @@ def create_app():
         cors.init_app(app)
 
     # Importar e registrar Blueprints
-    from routes.product_routes import product_bp
-    from routes.category_routes import category_bp
-    from routes.stock_routes import stock_bp
-    from routes.inventory_routes import inventory_bp
+    from app.routes.product_routes import product_bp
+    from app.routes.category_routes import category_bp
+    from app.routes.stock_routes import stock_bp
+    from app.routes.inventory_routes import inventory_bp
 
-    app.register_blueprint(product_bp)
-    app.register_blueprint(category_bp)
-    app.register_blueprint(stock_bp)
-    app.register_blueprint(inventory_bp)
+    app.register_blueprint(product_bp, url_prefix='/api/inventory/products')
+    app.register_blueprint(category_bp, url_prefix='/api/inventory/category')
+    app.register_blueprint(stock_bp, url_prefix='/api/inventory/stock')
+    app.register_blueprint(inventory_bp, url_prefix='/api/inventory/inventory')
 
     return app

@@ -1,10 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy # type: ignore
-from sqlalchemy.orm import declarative_base
-
-Base = declarative_base()
-
 def reset_db(db):
-    from app.models import Product, Category, Inventory, Stock
+    from app.models import Category, Inventory, Product, Stock
     
     print("Resetando o banco de dados...")
     db.drop_all()

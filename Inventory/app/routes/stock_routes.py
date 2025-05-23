@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
-from models import Stock, Product, Inventory
+from app.models import Stock, Product, Inventory
 from app import db
 
-stock_bp = Blueprint('stock', __name__, url_prefix='/stock')
+stock_bp = Blueprint('stock', __name__)
 
 @stock_bp.route('/', methods=['POST'])
 def create_stock():

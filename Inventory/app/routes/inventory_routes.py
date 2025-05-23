@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
-from models import Inventory
+from app.models import Inventory
 from app import db
 
-inventory_bp = Blueprint('inventory', __name__, url_prefix='/inventory')
+inventory_bp = Blueprint('inventory', __name__)
 
 @inventory_bp.route('/', methods=['POST'])
 def create_inventory():
