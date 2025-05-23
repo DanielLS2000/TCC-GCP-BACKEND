@@ -8,7 +8,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    CORS(app)  # Habilita CORS
+    CORS(app, resources={r"/api/*": {"origins": "*"}})  # Habilita CORS
     jwt = JWTManager(app)
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
