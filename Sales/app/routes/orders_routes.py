@@ -124,7 +124,26 @@ def update_order(order_id):
         order.status = data.get("status", order.status)
 
         # Atualizando os itens do pedido de venda
-        ## TODO: Implementar a atualização dos itens do pedido de venda
+        items = data.get("items")
+        order_items = SaleItem.query.filter_by(sale_order_id=order.id).all()
+        # Removendo os itens que estavam no pedido
+        for item in order_items:
+            db.session.delete(item)
+        # Adicionando os novos itens
+        if items is not None and isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    return jsonify({"error": "Invalid item format"}), 400
+                if 'product_id' not in item or 'quantity' not in item or 'price' not in item:
+                    return jsonify({"error": "Product ID, quantity and price are required for each item"}), 400
+                sale_item = SaleItem(
+                    sale_order_id=order.id,
+                    product_id=item['product_id'],
+                    quantity=item['quantity'],
+                    price=item['price'],
+                    discount=item.get('discount', 0.0)
+                )
+                db.session.add(sale_item)
 
         db.session.commit()
 
