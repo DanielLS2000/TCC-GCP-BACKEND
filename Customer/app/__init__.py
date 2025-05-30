@@ -11,6 +11,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_pyfile('../config.py')
 
+    cors = CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
     with app.app_context():
         # Resetar o banco de dados
         from app.database import reset_db
@@ -18,10 +20,10 @@ def create_app():
         reset_db(db)
 
         jwt.init_app(app)
-        cors.init_app(app)
+        cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
 
     # Importar e registrar Blueprints
     from app.routes.customer_routes import customer_bp
-    app.register_blueprint(customer_bp, url_prefix='/api/clients')
+    app.register_blueprint(customer_bp, url_prefix='/api/customers')
 
     return app
