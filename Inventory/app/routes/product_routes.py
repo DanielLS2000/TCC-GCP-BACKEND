@@ -1,118 +1,170 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, url_for
 from app.models import Product, Category
 from app import db
+from flask_jwt_extended import jwt_required
 
 product_bp = Blueprint('products', __name__)
 
+
 @product_bp.route('/', methods=['POST'])
+@jwt_required()
 def create_product():
     data = request.get_json()
 
-    # Verificando o pacote recebido
-    if not isinstance(data, dict):
-        return jsonify({"error": "Invalid JSON format"}), 400
-    
-    # Verificando se a categoria existe caso fornecida
-    category_id = data.get('category_id')
-    if category_id is not None and not Category.query.filter_by(id=category_id).first():
-        return jsonify({"error": "Category not found"}), 404
-    
-    # Verificando os dados necessarios
+    if not data:
+        return jsonify({"msg": "Request body is missing or not JSON"}), 400
+
     name = data.get("name")
-    buy_price=data.get('buy_price')
-    if name is not None and buy_price is not None:
+    buy_price = data.get("buy_price")
 
-        new_product = Product(
-            name=data.get('name'),
-            buy_price=data.get('buy_price'),
-            desc=data.get('desc'),  
-            sell_price=data.get('sell_price'),
-            category_id=category_id,  
-            category_details=data.get('category_details'),  
-            product_image=data.get('product_image')
-        )
+    if not name or buy_price is None: # Checar se buy_price foi fornecido
+        missing_fields = []
+        if not name: missing_fields.append('name')
+        if buy_price is None: missing_fields.append('buy_price')
+        return jsonify({
+            "msg": "Insufficient or invalid data provided.",
+            "details": {field: f"{field.capitalize()} is required." for field in missing_fields}
+        }), 422
 
+    category_id = data.get('category_id')
+    if category_id is not None:
+        category = db.session.get(Category, category_id)
+        if not category:
+            return jsonify({"msg": "Category not found"}), 404
 
+    new_product = Product(
+        name=name,
+        buy_price=buy_price,
+        desc=data.get('desc'),
+        sell_price=data.get('sell_price'),
+        category_id=category_id,
+        category_details=data.get('category_details'),
+        product_image=data.get('product_image')
+    )
+
+    try:
         db.session.add(new_product)
         db.session.commit()
         db.session.refresh(new_product)
-        
-        return jsonify(data), 201
-    else:
-        return jsonify({"error": "Insuficient data"}), 406
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to save product to database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
+
+    location_uri = url_for('products.get_product_by_id', product_id=new_product.id, _external=True)
+
+    return jsonify(new_product.to_dict()), 201, {'Location': location_uri}
 
 
 @product_bp.route('/', methods=['GET'])
-def get_products():
-    products = Product.query.all()
-    products_dict = [product.to_dict() for product in products]
+@jwt_required()
+def get_all_products():
+    try:
+        products = Product.query.all()
+        products_dict = [product.to_dict() for product in products]
+        return jsonify(products_dict), 200
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred", "details_dev": str(e)}), 500
 
-    return jsonify(products_dict)
+@product_bp.route('/<int:product_id>', methods=['GET'])
+@jwt_required()
+def get_product_by_id(product_id: int):
+    try:
+        product = db.session.get(Product, product_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching product", "details_dev": str(e)}), 500
 
-@product_bp.route('/<int:product_id>/read', methods=['GET'])
-def get_product(product_id):
-    product = Product.query.filter_by(id=product_id).first()
-    
     if product:
         return jsonify(product.to_dict()), 200
     else:
-        return jsonify({"error": "Product not found"}), 404
+        return jsonify({"msg": "Product not found"}), 404
 
-@product_bp.route('/<int:product_id>/update', methods=['PUT'])
-def update_product(product_id):
-    product = Product.query.filter_by(id=product_id).first()
-    
-    # Verificando se o produto existe 
+
+@product_bp.route('/<int:product_id>', methods=['PUT'])
+@jwt_required()
+def update_product_by_id(product_id: int):
+    try:
+        product = db.session.get(Product, product_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching product for update", "details_dev": str(e)}), 500
+
     if not product:
-        return jsonify({"message": "Produto não encontrado"}), 404
-    
-    # Verificando o pacote recebido
+        return jsonify({"msg": "Product not found"}), 404
+
     data = request.get_json()
-    if not isinstance(data, dict):
-        return jsonify({"error": "Invalid JSON format"}), 400
+    if not data:
+        return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
-    # Verificando se a categoria existe caso fornecida
-    category_id = data.get('category_id')
-    if category_id is not None and not Category.query.filter_by(id=category_id).first():
-        return jsonify({"error": "Category not found"}), 404
-    
-    # Verificando os dados necessarios 
     name = data.get("name")
-    buy_price=data.get('buy_price')
-    if name is not None and buy_price is not None:
-        product.name=name
-        product.buy_price=buy_price
-        product.desc=data.get('desc')
-        product.sell_price=data.get('sell_price')
-        product.category_id=category_id
-        product.category_details=data.get('category_details')
-        product.product_image=data.get('product_image')
-        
+    buy_price = data.get("buy_price")
+
+    if 'name' in data and not name:
+        return jsonify({"msg": "Invalid data for update.", "details": {"name": "Name cannot be empty if provided."}}), 422
+    if 'buy_price' in data and buy_price is None:
+        return jsonify({"msg": "Invalid data for update.", "details": {"buy_price": "Buy price cannot be null if provided."}}), 422
+
+    category_id = data.get('category_id')
+    if category_id is not None:
+        category = db.session.get(Category, category_id)
+        if not category:
+            return jsonify({"msg": "Category not found"}), 404
+    
+    # Atualizando os campos do produto
+    product.name = data.get('name', product.name)
+    product.buy_price = data.get('buy_price', product.buy_price)
+    product.desc = data.get('desc', product.desc)
+    product.sell_price = data.get('sell_price', product.sell_price)
+    if "category_id" in data:
+        product.category_id = category_id
+    product.category_details = data.get('category_details', product.category_details)
+    product.product_image = data.get('product_image', product.product_image)
+
+    try:
         db.session.commit()
-
-        return jsonify(200)
-    else:
-        return jsonify({"error": "Insuficient data"}), 406
-
-@product_bp.route('/<int:product_id>/delete', methods=['DELETE'])
-def delete_product(product_id):
-    product = Product.query.filter_by(id=product_id).first()
+        product_data_dict = product.to_dict()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to update product in database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
     
+    return jsonify(product_data_dict), 200
+
+
+@product_bp.route('/<int:product_id>', methods=['DELETE'])
+@jwt_required()
+def delete_product_by_id(product_id: int):
+    try:
+        product = db.session.get(Product, product_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching product for deletion", "details_dev": str(e)}), 500
+
     if not product:
-        return jsonify({"message": "Produto não encontrado"}), 404
+        return jsonify({"msg": "Product not found"}), 404
     
-    db.session.delete(product)
-    
-    db.session.commit()
+    try:
+        db.session.delete(product)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete product from database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
 
-    return jsonify(200)
+    return Response(status=204)
+
 
 @product_bp.route('/search', methods=['GET'])
-def search_product():
-    search_term = request.args.get('name', '')
-    
+@jwt_required()
+def search_products_by_name(): 
+    search_term = request.args.get('name')
+
     if not search_term:
-        return jsonify({"message": "Termo de pesquisa é necessário"}), 400
+        return jsonify({"msg": "Search term 'name' is required"}), 400
     
-    products = Product.query.filter(Product.name.ilike(f'%{search_term}%')).all()
-    return jsonify([product.to_dict() for product in products])
+    try:
+        products = Product.query.filter(Product.name.ilike(f'%{search_term}%')).all()
+        return jsonify([product.to_dict() for product in products]), 200
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred during product search", "details_dev": str(e)}), 500

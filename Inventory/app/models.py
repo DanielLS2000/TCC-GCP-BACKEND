@@ -7,7 +7,7 @@ class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True, index=True)
     name = db.Column(db.String, nullable=False)
     details_model = db.Column(db.String, nullable=False)
-    parent_category = db.Column(db.Integer, db.ForeignKey("category.id", ondelete="SET NULL"), nullable=True)
+    parent_category_id = db.Column(db.Integer, db.ForeignKey("category.id", ondelete="SET NULL"), nullable=True)
 
     def __repr__(self):
         return f'<Name {self.name}>'
@@ -17,7 +17,7 @@ class Category(db.Model):
             'id': self.id,
             'name': self.name,
             'details_model': self.details_model,
-            'parent_category': self.parent_category
+            'parent_category': self.parent_category_id
         }
     
 
@@ -74,7 +74,7 @@ class Stock(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, index=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="SET NULL"), nullable=False)
-    inventory_id = db.Column(db.Integer, db.ForeignKey("inventory.id", ondelete="SET NULL"), nullable=False)
+    inventory_location_id = db.Column(db.Integer, db.ForeignKey("inventory.id", ondelete="SET NULL"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
 
     def __repr__(self):

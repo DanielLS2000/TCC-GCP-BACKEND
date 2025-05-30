@@ -1,75 +1,133 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, url_for
 from app.models import Inventory
 from app import db
+from flask_jwt_extended import jwt_required
 
 inventory_bp = Blueprint('inventory', __name__)
 
+
 @inventory_bp.route('/', methods=['POST'])
-def create_inventory():
+@jwt_required()
+def create_inventory_location():
     data = request.get_json()
 
-    # Verificando o pacote recebido
-    if not isinstance(data, dict):
-        return jsonify({"error": "Invalid JSON format"}), 400
+    if not data:
+        return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
-    # Verificando dados necessarios
+    # Validando os campos obrigatórios
     name = data.get("name")
     address = data.get("address")
-    if name is not None and address is not None:
-        new_inventory = Inventory(
-            name=name,
-            adress=address
-        )
 
-        db.session.add(new_inventory)
+    if not name or not address:
+        missing_fields = []
+        if not name: missing_fields.append('name')
+        if not address: missing_fields.append('address')
+        return jsonify({
+            "msg": "Insufficient or invalid data provided.",
+            "details": {field: f"{field.capitalize()} is required." for field in missing_fields}
+        }), 422
+
+    new_location = Inventory(
+        name=name,
+        address=address
+    )
+
+    try:
+        db.session.add(new_location)
         db.session.commit()
-        db.session.refresh(new_inventory)
-        
-        return jsonify(data), 201
-    else:
-        return jsonify({"error": "Insuficient data"}), 406
+        db.session.refresh(new_location)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to save inventory location to database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
+
+    location_uri = url_for('inventory.get_inventory_location_by_id', location_id=new_location.id, _external=True)
+
+    return jsonify(new_location.to_dict()), 201, {'Location': location_uri}
+
 
 @inventory_bp.route('/', methods=['GET'])
-def read_inventory():
-    categories = Inventory.query.all()
-    categories_dict = [inventory.to_dict() for inventory in categories]
+@jwt_required()
+def get_all_inventory_locations(): 
+    try:
+        locations = Inventory.query.all()
+        locations_dict = [location.to_dict() for location in locations]
+        return jsonify(locations_dict), 200
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred", "details_dev": str(e)}), 500
 
-    return jsonify(categories_dict), 200
+@inventory_bp.route('/<int:location_id>', methods=['GET'])
+@jwt_required()
+def get_inventory_location_by_id(location_id: int):
+    try:
+        location = db.session.get(Inventory, location_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching inventory location", "details_dev": str(e)}), 500
 
-@inventory_bp.route('/<int:inventory_id>/update', methods=['PUT'])
-def update_inventory(inventory_id):
+    if location:
+        return jsonify(location.to_dict()), 200
+    else:
+        return jsonify({"msg": "Inventory location not found"}), 404
+
+
+@inventory_bp.route('/<int:location_id>', methods=['PUT'])
+@jwt_required()
+def update_inventory_location_by_id(location_id: int):
+    try:
+        location = db.session.get(Inventory, location_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching inventory location for update", "details_dev": str(e)}), 500
+
+    if not location:
+        return jsonify({"msg": "Inventory location not found"}), 404
+
     data = request.get_json()
-
-    # Verificando o pacote recebido
-    if not isinstance(data, dict):
-        return jsonify({"error": "Invalid JSON format"}), 400
-
-    # Verificando se o inventario existe
-    inventory = Inventory.query.filter_by(id=inventory_id).first()
-    if not inventory:
-        return jsonify({"message": "Inventario não encontrado"}), 404
+    if not data:
+        return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     name = data.get("name")
     address = data.get("address")
-    if name is not None and address is not None:
-        inventory.name=name
-        inventory.address=address
 
+    if 'name' in data and not name:
+        return jsonify({"msg": "Invalid data for update.", "details": {"name": "Name cannot be empty if provided."}}), 422
+    if 'address' in data and not address:
+        return jsonify({"msg": "Invalid data for update.", "details": {"address": "Address cannot be empty if provided."}}), 422
+
+    location.name = data.get('name', location.name)
+    location.address = data.get('address', location.address)
+
+    location_data_dict = location.to_dict()
+
+    try:
         db.session.commit()
-        
-        return jsonify(data), 200
-    else:
-        return jsonify({"error": "Insuficient data"}), 406
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to update inventory location in database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
 
-@inventory_bp.route('/<int:inventory_id>/delete', methods=['DELETE'])
-def delete_inventory(inventory_id):
-    inventory = Inventory.query.filter_by(id=inventory_id).first()
-    
-    if not inventory:
-        return jsonify({"message": "Inventario não encontrado"}), 404
-    
-    db.session.delete(inventory)
-    
-    db.session.commit()
+    return jsonify(location_data_dict), 200
 
-    return jsonify(200)
+
+@inventory_bp.route('/<int:location_id>', methods=['DELETE'])
+@jwt_required()
+def delete_inventory_location_by_id(location_id: int):
+    try:
+        location = db.session.get(Inventory, location_id)
+    except Exception as e:
+        return jsonify({"error": "An internal server error occurred while fetching inventory location for deletion", "details_dev": str(e)}), 500
+    
+    if not location:
+        return jsonify({"msg": "Inventory location not found"}), 404
+    
+    try:
+        db.session.delete(location)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to delete inventory location from database", "details_dev": str(e)}), 500
+    finally:
+        db.session.close()
+
+    return Response(status=204)

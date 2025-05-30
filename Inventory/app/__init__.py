@@ -27,8 +27,8 @@ def create_app():
     from app.routes.inventory_routes import inventory_bp
 
     app.register_blueprint(product_bp, url_prefix='/api/inventory/products')
-    app.register_blueprint(category_bp, url_prefix='/api/inventory/category')
+    app.register_blueprint(category_bp, url_prefix='/api/inventory/categories')
     app.register_blueprint(stock_bp, url_prefix='/api/inventory/stock')
-    app.register_blueprint(inventory_bp, url_prefix='/api/inventory/inventory')
+    app.register_blueprint(inventory_bp, url_prefix='/api/inventory/locations')
 
     return app
