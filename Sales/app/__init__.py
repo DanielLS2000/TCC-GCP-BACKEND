@@ -18,7 +18,7 @@ def create_app():
         reset_db(db)
 
         jwt.init_app(app)
-        cors.init_app(app)
+        cors.init_app(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
     # Importar e registrar Blueprints
     from app.routes.orders_routes import sale_orders_bp
