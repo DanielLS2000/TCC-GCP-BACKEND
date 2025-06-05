@@ -13,8 +13,9 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
         
     email = data.get('email')
@@ -70,8 +71,9 @@ def get_current_user():
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     username = data.get('username')
