@@ -1,17 +1,20 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from werkzeug.exceptions import BadRequest
 
 db = SQLAlchemy()
 jwt = JWTManager()
 cors = CORS()
 
-def create_app():
+def create_app(config_overrides=None):
     app = Flask(__name__)
     app.config.from_pyfile('../config.py')
 
-    cors = CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+    # Configurações para teste
+    if config_overrides:
+        app.config.update(config_overrides)
 
     with app.app_context():
         # Resetar o banco de dados
@@ -20,7 +23,7 @@ def create_app():
         reset_db(db)
 
         jwt.init_app(app)
-        cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+        cors.init_app(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
     # Importar e registrar Blueprints
     from app.routes.customer_routes import customer_bp

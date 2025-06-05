@@ -20,9 +20,9 @@ def get_customers() -> tuple[Response, int]:
 @customer_bp.route('/', methods=["POST"])
 @jwt_required()
 def create_customer():
-    data = request.get_json()
-
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     # Validando os campos obrigatórios
@@ -82,8 +82,9 @@ def update_customer(customer_id: int):
     if not customer:
         return jsonify({"msg": "Customer not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
     
     # Verificando se os campos obrigatórios estão presentes
