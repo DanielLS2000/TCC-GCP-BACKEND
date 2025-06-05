@@ -9,9 +9,9 @@ category_bp = Blueprint('category', __name__)
 @category_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_category():
-    data = request.get_json()
-
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     name = data.get("name")
@@ -88,8 +88,9 @@ def update_category_by_id(category_id: int):
     if not category:
         return jsonify({"msg": "Category not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
 

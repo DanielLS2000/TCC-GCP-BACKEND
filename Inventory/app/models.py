@@ -36,7 +36,7 @@ class Inventory(db.Model):
         return {
             'id': self.id,
             'name': self.name,
-            'address': self.adress
+            'address': self.address
         }
     
 
@@ -84,6 +84,6 @@ class Stock(db.Model):
         return {
             'id': self.id,
             'product_id': self.product_id,
-            'inventory_id': self.inventory_id,
+            'inventory_location_id': self.inventory_location_id,
             'quantity': self.quantity
         }

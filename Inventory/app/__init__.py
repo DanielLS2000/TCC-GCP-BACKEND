@@ -7,9 +7,13 @@ db = SQLAlchemy()
 jwt = JWTManager()
 cors = CORS()
 
-def create_app():
+def create_app(config_overrides=None):
     app = Flask(__name__)
     app.config.from_pyfile('../config.py')
+
+    # Configurações para teste
+    if config_overrides:
+        app.config.update(config_overrides)
 
     with app.app_context():
         # Resetar o banco de dados

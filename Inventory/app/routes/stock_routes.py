@@ -9,9 +9,9 @@ stock_bp = Blueprint('stock', __name__)
 @stock_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_stock_item():
-    data = request.get_json()
-
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     product_id = data.get("product_id")
@@ -96,8 +96,9 @@ def update_stock_item_by_id(stock_item_id: int):
     if not stock_item:
         return jsonify({"msg": "Stock item not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     product_id = data.get("product_id")

@@ -9,9 +9,9 @@ product_bp = Blueprint('products', __name__)
 @product_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_product():
-    data = request.get_json()
-
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     name = data.get("name")
@@ -92,8 +92,9 @@ def update_product_by_id(product_id: int):
     if not product:
         return jsonify({"msg": "Product not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     name = data.get("name")
