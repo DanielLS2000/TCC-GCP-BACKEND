@@ -23,13 +23,13 @@ def get_sales():
     except Exception as e:
         return jsonify({"error": "An internal server error occurred", "details_dev": str(e)}), 500
 
-
+# Refazer função
 @sale_orders_bp.route('/', methods=["POST"])
 @jwt_required()
 def create_sale():
-    data = request.get_json()
-
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     # Requer client_id, employee_id, items.
@@ -79,7 +79,7 @@ def create_sale():
     new_sale = SaleOrder(
         client_id=client_id,
         employee_id=employee_id,
-        date=data.get('date', datetime.utcnow()),
+        date=data.get('date', datetime.now()),
         payment_method=data.get('payment_method'),
         status=data.get('status', 'Pending')
     )
@@ -129,6 +129,7 @@ def get_sale_by_id(sale_id: int):
     else:
         return jsonify({"msg": "Sale not found"}), 404
 
+# Refazer função
 @sale_orders_bp.route('/<int:sale_id>', methods=["PUT"])
 @jwt_required()
 def update_sale_by_id(sale_id: int):
@@ -140,8 +141,9 @@ def update_sale_by_id(sale_id: int):
     if not sale:
         return jsonify({"msg": "Sale not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     # Atualizando os campos da venda principal
@@ -150,7 +152,6 @@ def update_sale_by_id(sale_id: int):
     sale.date = data.get("date", sale.date)
     sale.payment_method = data.get("payment_method", sale.payment_method)
     sale.status = data.get("status", sale.status)
-    
     # TODO: Se client_id ou employee_id forem alterados, VALIDAR sua existência via comunicação entre serviços.
 
     items_payload = data.get("items")
@@ -161,7 +162,6 @@ def update_sale_by_id(sale_id: int):
         # Remover itens antigos e adicionar novos
         try:
             SaleItem.query.filter_by(sale_order_id=sale.id).delete() #
-            
             sale_items_to_update = []
             for item_data in items_payload:
                 if not isinstance(item_data, dict): #
@@ -188,7 +188,6 @@ def update_sale_by_id(sale_id: int):
                     price=price,
                     discount=item_data.get('discount', 0.0) #
                 ))
-            
             if sale_items_to_update:
                 db.session.add_all(sale_items_to_update)
             
