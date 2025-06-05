@@ -21,7 +21,10 @@ def get_employees() -> tuple[Response, int]:
 @hr_bp.route('/', methods=["POST"])
 @jwt_required()
 def create_employee():
-    data = request.get_json()
+    try:
+        data = request.get_json()
+    except Exception as e:
+        return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     if not data:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
@@ -87,8 +90,9 @@ def update_employee_by_id(employee_id: int): # Nome da função atualizado para 
     if not employee:
         return jsonify({"msg": "Employee not found"}), 404
 
-    data = request.get_json()
-    if not data:
+    try:
+        data = request.get_json()
+    except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
     # Validando os campos obrigatórios
