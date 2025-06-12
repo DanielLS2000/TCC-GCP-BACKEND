@@ -2,13 +2,12 @@
 FROM python:3.12-slim
 
 # Define o diretório de trabalho dentro do container
-WORKDIR /app
+WORKDIR /workdir
 
 # Copia os arquivos do projeto para dentro do container
-COPY . .
-
-# Instala as dependências
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /workdir/src
+COPY requirements.txt /workdir/requirements.txt
+RUN pip install --no-cache-dir -r /workdir/requirements.txt
 
 # Expõe a porta que o Flask vai usar
 EXPOSE 5000
@@ -18,4 +17,4 @@ ENV FLASK_APP=auth_service.py
 ENV FLASK_RUN_HOST=0.0.0.0
 
 # Comando para iniciar o Flask
-CMD ["python", "./app.py"]
+CMD ["python", "./src/auth_service.py"]
