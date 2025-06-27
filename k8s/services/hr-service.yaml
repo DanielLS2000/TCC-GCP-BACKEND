@@ -1,0 +1,15 @@
+# kubernetes/hr-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: hr-service
+  labels:
+    app: hr-service
+spec:
+  selector:
+    app: hr-service
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP # Tipo ClusterIP para comunicação interna no cluster

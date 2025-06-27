@@ -1,5 +1,9 @@
-from flask import Blueprint, request, jsonify, Response, url_for
+import json
+import os
+from werkzeug.utils import secure_filename
+from flask import Blueprint, request, jsonify, Response, url_for, current_app, send_from_directory
 from app.models import Product, Category
+from config import UPLOAD_FOLDER
 from app import db
 from flask_jwt_extended import jwt_required
 
@@ -9,28 +13,42 @@ product_bp = Blueprint('products', __name__)
 @product_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_product():
+
+    if 'product' not in request.files:
+        return jsonify({"msg": "O campo 'product' (enviado como Blob/file) é obrigatório."}), 400
+
     try:
-        data = request.get_json()
+        product_file = request.files['product']
+        product_json_string = product_file.read().decode('utf-8')
+        data = json.loads(product_json_string)
     except Exception as e:
-        return jsonify({"msg": "Request body is missing or not JSON"}), 400
+        return jsonify({"msg": "Erro ao processar o JSON do produto.", "details_dev": str(e)}), 400
 
+    print("Dados recebidos:", data)
     name = data.get("name")
-    buy_price = data.get("buy_price")
+    buy_price = data.get("price")
 
-    if not name or buy_price is None: # Checar se buy_price foi fornecido
-        missing_fields = []
-        if not name: missing_fields.append('name')
-        if buy_price is None: missing_fields.append('buy_price')
-        return jsonify({
-            "msg": "Insufficient or invalid data provided.",
-            "details": {field: f"{field.capitalize()} is required." for field in missing_fields}
-        }), 422
+    if not name or buy_price is None:
+        return jsonify({"msg": "Dados insuficientes (name, buy_price são obrigatórios)."}), 422
 
     category_id = data.get('category_id')
-    if category_id is not None:
+    if category_id:
         category = db.session.get(Category, category_id)
         if not category:
-            return jsonify({"msg": "Category not found"}), 404
+            return jsonify({"msg": "Categoria não encontrada"}), 404
+
+    product_image_path = None
+    if 'image' in request.files:
+        file = request.files['image']
+        if file.filename != '':
+            filename = secure_filename(file.filename)
+            upload_folder = current_app.config['UPLOAD_FOLDER']
+            if not os.path.exists(upload_folder):
+                os.makedirs(upload_folder)
+            
+            product_image_path = os.path.join(upload_folder, filename)
+            file.save(product_image_path)
+
 
     new_product = Product(
         name=name,
@@ -39,7 +57,7 @@ def create_product():
         sell_price=data.get('sell_price'),
         category_id=category_id,
         category_details=data.get('category_details'),
-        product_image=data.get('product_image')
+        product_image=product_image_path
     )
 
     try:
@@ -48,7 +66,7 @@ def create_product():
         db.session.refresh(new_product)
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Failed to save product to database", "details_dev": str(e)}), 500
+        return jsonify({"error": "Falha ao salvar o produto no banco de dados", "details_dev": str(e)}), 500
     finally:
         db.session.close()
 
@@ -169,3 +187,7 @@ def search_products_by_name():
         return jsonify([product.to_dict() for product in products]), 200
     except Exception as e:
         return jsonify({"error": "An internal server error occurred during product search", "details_dev": str(e)}), 500
+
+@product_bp.route('/image/<path:filename>', methods=['GET'])
+def get_product_image(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=False)

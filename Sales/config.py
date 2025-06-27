@@ -1,18 +1,23 @@
 import os
-from dotenv import load_dotenv
+from google.cloud import secretmanager
 
-# Set base directory of the app
-basedir = os.path.abspath(os.path.dirname(__file__))
+def get_secret(secret_name):
+    project_id = os.environ.get('GCP_PROJECT_ID') # Será definida no Deployment YAML
+    client = secretmanager.SecretManagerServiceClient()
+    name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+    response = client.access_secret_version(request={"name": name})
+    return response.payload.data.decode("UTF-8")
 
-# Load the .env and .flaskenv variables
-load_dotenv(os.path.join(basedir, ".env"))
 
+class Config:
+    # Obter secrets do Secret Manager
+    SECRET_KEY = get_secret('tcc-app-secret') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('SECRET_KEY', 'super-secret-key')
+    JWT_SECRET_KEY = get_secret('tcc-jwt-secret') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('JWT_SECRET_KEY', 'jwt-super-secret-key')
+    
+    SQLALCHEMY_DATABASE_URI = get_secret('SALES_DB_URL') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/sales_db")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-SECRET_KEY = os.environ.get("SECRET_KEY", 'super-secret-key')
-
-SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/sales_db")
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", 'jwt-super-secret-key')
-JWT_BLACKLIST_ENABLED = True
-JWT_BLACKLIST_TOKEN_CHECKS = ["access", "refresh"]
+    JWT_ACCESS_TOKEN_EXPIRES = 900
+    JWT_REFRESH_TOKEN_EXPIRES = 2592000
+    JWT_BLACKLIST_ENABLED = True
+    JWT_BLACKLIST_TOKEN_CHECKS = ["access", "refresh"]

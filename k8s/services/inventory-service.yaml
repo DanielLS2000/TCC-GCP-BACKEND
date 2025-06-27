@@ -1,0 +1,15 @@
+# kubernetes/inventory-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  labels:
+    app: inventory-service
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP # Tipo ClusterIP para comunicação interna no cluster

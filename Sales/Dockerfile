@@ -1,10 +1,14 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /workdir
 
 COPY . /workdir/src
 COPY requirements.txt /workdir/requirements.txt
 RUN pip install --no-cache-dir -r /workdir/requirements.txt
+
+ENV FLASK_APP=app.py
+ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=5000
 
 EXPOSE 5000
 

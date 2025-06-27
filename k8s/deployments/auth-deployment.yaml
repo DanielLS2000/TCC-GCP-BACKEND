@@ -1,0 +1,64 @@
+# kubernetes/auth-deploy.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-deploy # Sugestão de nome: auth-deploy
+  labels:
+    app: auth-service
+spec:
+  replicas: 1 # Comece com 1, aumente conforme a necessidade
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      serviceAccountName: auth-sa # Nome da Service Account do Kubernetes criada
+      containers:
+        - name: auth-api
+          image: us-central1-docker.pkg.dev/key-hope-455618-p3/tcc-erp-repo/auth-service:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: KUBERNETES_DEPLOYMENT
+              value: "true" # Flag para ativar a leitura de secrets
+            - name: GCP_PROJECT_ID
+              value: "key-hope-455618-p3" # Necessário para o Secret Manager
+            # As variáveis SECRET_KEY, JWT_SECRET_KEY, DATABASE_URL serão lidas do Secret Manager
+            # via a função get_secret no seu código Flask, usando a Workload Identity.
+            # Não as coloque aqui explicitamente!
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+        - name: cloudsql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.17.1
+          command: ["/cloud-sql-proxy",
+                    "key-hope-455618-p3:us-east1:auth-db-instance", # Nome da conexão da instância diretamente
+                    "--port=5432"]
+          securityContext:
+            runAsNonRoot: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: gcp-sa-key
+              mountPath: /var/run/secrets/tokens/gcp-sa-key
+              readOnly: true
+      volumes:
+        - name: gcp-sa-key
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: https://iam.googleapis.com/projects/key-hope-455618-p3/locations/global/workloadIdentityPools/gcp-service-account.iam.gserviceaccount.com
+                  expirationSeconds: 3600
+                  path: token

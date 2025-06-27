@@ -11,6 +11,7 @@ jwt = JWTManager()
 cors = CORS()
 
 def create_app(config_overrides=None):
+    print(f"A URI do banco de dados é: {Config.SQLALCHEMY_DATABASE_URI}")
     app = Flask(__name__)
     app.config.from_object(Config)
 
@@ -36,11 +37,14 @@ def create_app(config_overrides=None):
 
         # Create database tables
 
-        try:
-            reset_db(db)
-        except Exception as e:
-            print(f"Error creating database tables: {e}")
-            reset_db(db)
+        if app.config.get("TESTING", False): # Ou outra variável de ambiente de prod
+            try:
+                reset_db(db)
+            except Exception as e:
+                print(f"Error creating database tables (during test setup): {e}")
+        else:
+            # Em produção, apenas crie as tabelas se não existirem (sem drop_all)
+            db.create_all() # Isso cria tabelas se elas não existirem. Não apaga dados.
 
     from auth.routes import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
