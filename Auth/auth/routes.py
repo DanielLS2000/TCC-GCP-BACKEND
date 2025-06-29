@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, url_for
+from flask import Blueprint, request, jsonify, url_for, redirect, current_app
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -6,7 +6,7 @@ from flask_jwt_extended import (
     get_jwt_identity
 )
 from auth.models import User
-from auth import db
+from auth import db, oauth
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -43,6 +43,60 @@ def login():
         access_token=access_token,
         refresh_token=refresh_token
     ), 200
+
+@auth_bp.route('/google-login', methods=['GET'])
+def google_login():
+    """Initiates the Google OAuth login flow."""
+    # current_app.config['GOOGLE_REDIRECT_URI'] is retrieved from config
+    redirect_uri = current_app.config['GOOGLE_REDIRECT_URI']
+    return oauth.google.authorize_redirect(redirect_uri)
+
+@auth_bp.route('/google-callback', methods=['GET'])
+def google_callback():
+    """Handles the callback from Google OAuth."""
+    try:
+        token = oauth.google.authorize_access_token()
+        userinfo = oauth.google.parse_id_token(token) # Get user info from ID token
+        
+        google_email = userinfo['email']
+        google_name = userinfo.get('name', google_email.split('@')[0])
+        google_sub = userinfo['sub'] # Google's unique user ID
+
+        user = User.query.filter_by(email=google_email).first()
+
+        if not user:
+            # User does not exist, create a new one
+            new_user = User(
+                username=google_name, # Use Google name or part of email as username
+                email=google_email,
+                role='user' # Default role
+            )
+            # You might want a way to distinguish SSO users from password users,
+            # e.g., setting a dummy password or leaving password_hash null if allowed,
+            # or adding a 'sso_provider' field. For simplicity, we'll set a placeholder.
+            new_user.set_password("SSO_GOOGLE_USER_PASSWORD_PLACEHOLDER") # Or handle differently
+            db.session.add(new_user)
+            db.session.commit()
+            db.session.refresh(new_user)
+            user = new_user
+        
+        # Generate your application's JWTs
+        access_token = create_access_token(identity=user.email)
+        refresh_token = create_refresh_token(identity=user.email)
+        
+        # Redirect to frontend with tokens (or a success page)
+        # It's generally safer to redirect to a frontend route and pass tokens in query params
+        # or use local storage (less secure, but common for SPAs).
+        # For simplicity, we'll redirect with tokens as query parameters.
+        # In a real application, you might redirect to a specific success page or handle
+        # the token transfer more securely.
+        frontend_redirect_url = f"http://localhost:4200/login-success?access_token={access_token}&refresh_token={refresh_token}&user_id={user.id}&user_name={user.username}"
+        return redirect(frontend_redirect_url)
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Google OAuth callback error: {e}")
+        return jsonify({"msg": f"Google authentication failed: {e}"}), 400
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)

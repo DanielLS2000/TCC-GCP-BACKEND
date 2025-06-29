@@ -8,6 +8,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.Text, nullable=False)
     role = db.Column(db.String(50), nullable=False, default='user')
+    google_id = db.Column(db.String(255), unique=True, nullable=True)
 
     def __repr__(self):
         return f'<User {self.username}>'
