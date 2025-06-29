@@ -24,8 +24,8 @@ class Config:
     JWT_BLACKLIST_TOKEN_CHECKS = ["access", "refresh"]
 
     # Google OAUTH2.0
-    GOOGLE_CLIENT_ID = get_secret('GOOGLE_CLIENT_ID') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('GOOGLE_CLIENT_ID', '801948229384-9lajdj7ss20f4sl4mbhjgrfterpdqm3a.apps.googleusercontent.com')
-    GOOGLE_CLIENT_SECRET = get_secret('GOOGLE_CLIENT_SECRET') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('GOOGLE_CLIENT_SECRET', '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')
+    GOOGLE_CLIENT_ID = get_secret('GOOGLE_CLIENT_ID') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('GOOGLE_CLIENT_ID', 'google_client_id')
+    GOOGLE_CLIENT_SECRET = get_secret('GOOGLE_CLIENT_SECRET') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('GOOGLE_CLIENT_SECRET', 'google_client_secret')
     GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
     # This redirect URI must be registered in your Google Cloud Console for the OAuth 2.0 client ID
     # For local development, it might be http://localhost:5000/api/auth/google-callback
