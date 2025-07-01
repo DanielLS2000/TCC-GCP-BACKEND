@@ -6,8 +6,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Agora as importações devem funcionar
 import pytest
 from flask_jwt_extended import create_access_token
-from app import create_app as customer_create_app, db as customer_db_instance
-from app.models import Customer as CustomerModel_Class
+from customer import create_app as customer_create_app, db as customer_db_instance
+from customer.models import Customer as CustomerModel_Class
 
 @pytest.fixture(scope='session')
 def test_app_instance():

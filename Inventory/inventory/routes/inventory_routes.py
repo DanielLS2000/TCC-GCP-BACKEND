@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, Response, url_for
-from app.models import Inventory
-from app import db
+from inventory.models import Inventory
+from inventory import db
 from flask_jwt_extended import jwt_required
 
 inventory_bp = Blueprint('inventory', __name__)

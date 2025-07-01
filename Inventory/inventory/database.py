@@ -1,5 +1,5 @@
 def reset_db(db):
-    from app.models import Customer
+    from inventory.models import Category, Inventory, Product, Stock
     
     print("Resetando o banco de dados...")
     db.drop_all()

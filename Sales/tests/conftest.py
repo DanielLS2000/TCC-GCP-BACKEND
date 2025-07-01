@@ -8,8 +8,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Imports da sua aplicação Sales
-from app import create_app as sales_create_app, db as sales_db_instance
-from app.models import SaleOrder as SaleOrderModel_Class, SaleItem as SaleItemModel_Class
+from sales import create_app as sales_create_app, db as sales_db_instance
+from sales.models import SaleOrder as SaleOrderModel_Class, SaleItem as SaleItemModel_Class
 
 @pytest.fixture(scope='session')
 def test_app_instance_sales():

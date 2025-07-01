@@ -2,18 +2,21 @@ import json
 import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, Response, url_for, current_app, send_from_directory
-from app.models import Product, Category
-from config import UPLOAD_FOLDER
-from app import db
+from inventory.models import Product, Category
+from inventory import db
 from flask_jwt_extended import jwt_required
+from google.cloud import storage
 
 product_bp = Blueprint('products', __name__)
+
+storage_client = None
+if os.environ.get('KUBERNETES_DEPLOYMENT'):
+    storage_client = storage.Client()
 
 
 @product_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_product():
-
     if 'product' not in request.files:
         return jsonify({"msg": "O campo 'product' (enviado como Blob/file) é obrigatório."}), 400
 
@@ -37,17 +40,31 @@ def create_product():
         if not category:
             return jsonify({"msg": "Categoria não encontrada"}), 404
 
-    product_image_path = None
+    product_image_url = None
     if 'image' in request.files:
-        file = request.files['image']
-        if file.filename != '':
-            filename = secure_filename(file.filename)
-            upload_folder = current_app.config['UPLOAD_FOLDER']
-            if not os.path.exists(upload_folder):
-                os.makedirs(upload_folder)
+        image_file = request.files['image']
+        if image_file.filename != '':
+            # Generate a unique filename for GCS
+            # Use secure_filename to clean the original filename, but prepend a UUID or timestamp
+            import uuid
+            unique_filename = f"{uuid.uuid4()}_{secure_filename(image_file.filename)}"
             
-            product_image_path = os.path.join(upload_folder, filename)
-            file.save(product_image_path)
+            try:
+                bucket_name = current_app.config['GCS_BUCKET_NAME']
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(unique_filename)
+                
+                # Upload the file
+                blob.upload_from_file(image_file, content_type=image_file.content_type)
+                
+                # Make the blob publicly accessible if desired (for direct serving)
+                # Alternatively, use signed URLs for private access control
+                # blob.make_public() # Consider if truly needed, usually signed URLs or CDN is better
+
+                product_image_url = blob.public_url # Or blob.media_link, depending on access setup
+
+            except Exception as e:
+                return jsonify({"error": f"Falha ao fazer upload da imagem para GCS: {str(e)}"}), 500
 
 
     new_product = Product(
@@ -57,7 +74,7 @@ def create_product():
         sell_price=data.get('sell_price'),
         category_id=category_id,
         category_details=data.get('category_details'),
-        product_image=product_image_path
+        product_image=product_image_url # Store the GCS URL
     )
 
     try:
@@ -110,6 +127,37 @@ def update_product_by_id(product_id: int):
     if not product:
         return jsonify({"msg": "Product not found"}), 404
 
+    # Handle image update for GCS similar to creation, if 'image' is in request.files
+    product_image_url = product.product_image # Keep existing if not updated
+    if 'image' in request.files:
+        image_file = request.files['image']
+        if image_file.filename != '':
+            import uuid
+            unique_filename = f"{uuid.uuid4()}_{secure_filename(image_file.filename)}"
+            try:
+                bucket_name = current_app.config['GCS_BUCKET_NAME']
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(unique_filename)
+                blob.upload_from_file(image_file, content_type=image_file.content_type)
+                # blob.make_public() # Uncomment if public access is desired
+                product_image_url = blob.public_url
+            except Exception as e:
+                return jsonify({"error": f"Falha ao fazer upload da imagem atualizada para GCS: {str(e)}"}), 500
+    elif 'product_image' in data and data.get('product_image') is None:
+        # If product_image is explicitly set to null, delete the old one from GCS
+        if product.product_image:
+            try:
+                bucket_name = current_app.config['GCS_BUCKET_NAME']
+                bucket = storage_client.bucket(bucket_name)
+                # Extract blob name from URL (simple example, may need robust parsing)
+                blob_name = os.path.basename(product.product_image)
+                blob = bucket.blob(blob_name)
+                blob.delete()
+                product_image_url = None # Set to None after deletion
+            except Exception as e:
+                print(f"Warning: Failed to delete old image from GCS: {e}") # Log, but don't fail update
+                product_image_url = None # Ensure URL is cleared even if delete fails
+
     try:
         data = request.get_json()
     except Exception as e:
@@ -137,7 +185,9 @@ def update_product_by_id(product_id: int):
     if "category_id" in data:
         product.category_id = category_id
     product.category_details = data.get('category_details', product.category_details)
-    product.product_image = data.get('product_image', product.product_image)
+    # Use the new product_image_url if an image was uploaded/deleted, otherwise keep existing
+    product.product_image = product_image_url
+
 
     try:
         db.session.commit()
@@ -162,6 +212,18 @@ def delete_product_by_id(product_id: int):
     if not product:
         return jsonify({"msg": "Product not found"}), 404
     
+    # Delete image from GCS when product is deleted
+    if product.product_image:
+        try:
+            bucket_name = current_app.config['GCS_BUCKET_NAME']
+            bucket = storage_client.bucket(bucket_name)
+            # Extract blob name from URL (simple example, may need robust parsing)
+            blob_name = os.path.basename(product.product_image)
+            blob = bucket.blob(blob_name)
+            blob.delete()
+        except Exception as e:
+            print(f"Warning: Failed to delete image from GCS during product deletion: {e}") # Log, but don't stop product deletion
+
     try:
         db.session.delete(product)
         db.session.commit()
@@ -187,7 +249,3 @@ def search_products_by_name():
         return jsonify([product.to_dict() for product in products]), 200
     except Exception as e:
         return jsonify({"error": "An internal server error occurred during product search", "details_dev": str(e)}), 500
-
-@product_bp.route('/image/<path:filename>', methods=['GET'])
-def get_product_image(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=False)

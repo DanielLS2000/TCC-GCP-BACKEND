@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
-from app.database import reset_db
+from sales.database import reset_db, init_db
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -21,7 +21,7 @@ def create_app(config_overrides=None):
         # Initialize extensions
         db.init_app(app)
         jwt.init_app(app)
-        
+       
         # Config do CORS
         allowed_origins = [
             "http://34.95.123.94", # IP do Ingress
@@ -41,18 +41,11 @@ def create_app(config_overrides=None):
                 reset_db(db)
             except Exception as e:
                 print(f"Error creating database tables (during test setup): {e}")
-        else:
-            print("Attempting to create database tables if they don't exist...")
-            try:
-                db.create_all()
-                print("Database tables created successfully or already exist.")
-            except Exception as e:
-                print(f"ERROR: Failed to create database tables: {e}")
 
     # Importar e registrar Blueprints
-    from app.routes.employees_routes import hr_bp
-    app.register_blueprint(hr_bp, url_prefix='/api/employees')
-    from app.routes.health_routes import health_bp
+    from sales.routes.orders_routes import sale_orders_bp
+    app.register_blueprint(sale_orders_bp, url_prefix='/api/sales')
+    from sales.routes.health_routes import health_bp
     app.register_blueprint(health_bp)
 
     return app

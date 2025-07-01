@@ -1,9 +1,9 @@
-from flask import Flask, jsonify
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
-from app.database import reset_db
+from hr.database import reset_db, init_db
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -44,15 +44,15 @@ def create_app(config_overrides=None):
         else:
             print("Attempting to create database tables if they don't exist...")
             try:
-                db.create_all()
+                init_db(db=db)
                 print("Database tables created successfully or already exist.")
             except Exception as e:
                 print(f"ERROR: Failed to create database tables: {e}")
 
     # Importar e registrar Blueprints
-    from app.routes.customer_routes import customer_bp
-    app.register_blueprint(customer_bp, url_prefix='/api/customers')
-    from app.routes.health_routes import health_bp
+    from hr.routes.employees_routes import hr_bp
+    app.register_blueprint(hr_bp, url_prefix='/api/employees')
+    from hr.routes.health_routes import health_bp
     app.register_blueprint(health_bp)
 
     return app

@@ -26,20 +26,17 @@ spec:
               value: "true" # Flag para ativar a leitura de secrets
             - name: GCP_PROJECT_ID
               value: "key-hope-455618-p3" # Necessário para o Secret Manager
-            # As variáveis SECRET_KEY, JWT_SECRET_KEY, DATABASE_URL serão lidas do Secret Manager
-            # via a função get_secret no seu código Flask, usando a Workload Identity.
-            # Não as coloque aqui explicitamente!
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "200m"
+              memory: "128Mi"
+              cpu: "100m"
             limits:
               memory: "512Mi"
               cpu: "400m"
         - name: cloudsql-proxy
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.17.1
           command: ["/cloud-sql-proxy",
-                    "key-hope-455618-p3:us-east1:inventory-db-instance", # Nome da conexão da instância diretamente
+                    "key-hope-455618-p3:us-east1:auth-db-instance", # Renomear para inventory-db-instance
                     "--port=5432"]
           securityContext:
             runAsNonRoot: true

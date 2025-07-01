@@ -21,3 +21,5 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = 2592000
     JWT_BLACKLIST_ENABLED = True
     JWT_BLACKLIST_TOKEN_CHECKS = ["access", "refresh"]
+
+    GCS_BUCKET_NAME = get_secret('GCS_INVENTORY_BUCKET') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('GCS_INVENTORY_BUCKET', 'your-inventory-bucket-name')

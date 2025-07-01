@@ -36,7 +36,7 @@ spec:
         - name: cloudsql-proxy
           image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.17.1
           command: ["/cloud-sql-proxy",
-                    "key-hope-455618-p3:us-east1:sales-db-instance", # Nome da conexão da instância diretamente
+                    "key-hope-455618-p3:us-east1:auth-db-instance", # renomear para sales-db-instance
                     "--port=5432"]
           securityContext:
             runAsNonRoot: true

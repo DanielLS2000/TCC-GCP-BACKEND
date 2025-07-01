@@ -1,4 +1,4 @@
-from app import db
+from inventory import db
 from flask import url_for
 
 
@@ -58,10 +58,6 @@ class Product(db.Model):
     
     
     def to_dict(self):
-        image_url = None
-        if self.product_image:
-            image_url = url_for('products.get_product_image', filename=self.product_image, _external=True)
-
         return {
             'id': self.id,
             'name': self.name,
@@ -70,7 +66,7 @@ class Product(db.Model):
             'sell_price': self.sell_price,
             'category_id': self.category_id,
             'category_details': self.category_details,
-            'product_image': image_url
+            'product_image': self.product_image
         }
     
 

@@ -7,8 +7,8 @@ from flask_jwt_extended import create_access_token
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Imports do módulo Inventory
-from app import create_app as inventory_create_app, db as inventory_db_instance
-from app.models import (
+from inventory import create_app as inventory_create_app, db as inventory_db_instance
+from inventory.models import (
     Category as CategoryModel_Class,
     Inventory as InventoryLocationModel_Class, # Note: O modelo é 'Inventory' para locais
     Product as ProductModel_Class,

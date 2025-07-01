@@ -15,31 +15,31 @@ spec:
               name: auth-service
               port:
                 number: 5000
-        # - path: /api/inventory
-        #   pathType: Prefix
-        #   backend:
-        #     service:
-        #       name: inventory-service
-        #       port:
-        #         number: 5000
-        # - path: /api/sales
-        #   pathType: Prefix
-        #   backend:
-        #     service:
-        #       name: sales-service
-        #       port:
-        #         number: 5000
-        # - path: /api/customers
-        #   pathType: Prefix
-        #   backend:
-        #     service:
-        #       name: customer-service
-        #       port:
-        #         number: 5000
-        # - path: /api/employees
-        #   pathType: Prefix
-        #   backend:
-        #     service:
-        #       name: hr-service
-        #       port:
-        #         number: 5000
+        - path: /api/inventory
+          pathType: Prefix
+          backend:
+            service:
+              name: inventory-service
+              port:
+                number: 5000
+        - path: /api/sales
+          pathType: Prefix
+          backend:
+            service:
+              name: sales-service
+              port:
+                number: 5000
+        - path: /api/customers
+          pathType: Prefix
+          backend:
+            service:
+              name: customer-service
+              port:
+                number: 5000
+        - path: /api/employees
+          pathType: Prefix
+          backend:
+            service:
+              name: hr-service
+              port:
+                number: 5000

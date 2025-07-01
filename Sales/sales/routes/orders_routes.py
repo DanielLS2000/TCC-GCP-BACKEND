@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, Response, url_for
 from datetime import datetime
-from app.models import SaleOrder, SaleItem
-from app import db
+from sales.models import SaleOrder, SaleItem
+from sales import db
 from flask_jwt_extended import jwt_required
 
 sale_orders_bp = Blueprint('saleorders', __name__)
@@ -81,7 +81,7 @@ def create_sale():
         employee_id=employee_id,
         date=data.get('date', datetime.now()),
         payment_method=data.get('payment_method'),
-        status=data.get('status', 'Pending')
+        status=data.get('status', 'PENDING')
     )
 
     try:

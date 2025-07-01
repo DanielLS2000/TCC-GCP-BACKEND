@@ -11,7 +11,10 @@ class User(db.Model):
     google_id = db.Column(db.String(255), unique=True, nullable=True)
 
     def __repr__(self):
-        return f'<User {self.username}>'
+        return f'{self.username}'
+    
+    def __str__(self):
+        return f'{self.username}'
     
     def to_dict(self):
         return {

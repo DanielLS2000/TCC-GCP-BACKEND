@@ -1,5 +1,5 @@
 def reset_db(db):
-    from app.models import Employee
+    from hr.models import Employee
     
     print("Resetando o banco de dados...")
     db.drop_all()

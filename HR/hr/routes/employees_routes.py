@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, Response, url_for
-from app.models import Employee
-from app import db
+from hr.models import Employee
+from hr import db
 from flask_jwt_extended import jwt_required
 
 hr_bp = Blueprint('hr', __name__)

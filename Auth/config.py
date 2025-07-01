@@ -9,6 +9,8 @@ def get_secret(secret_name):
     return response.payload.data.decode("UTF-8")
 
 class Config:
+    REVERSE_PROXY = "34.54.133.133"
+    FRONTEND_HOST = "34.95.123.94"
     # Obter secrets do Secret Manager
     # Isso requer que a conta de serviço do Kubernetes tenha permissão para acessar esses secrets
     SECRET_KEY = get_secret('tcc-app-secret') if os.environ.get('KUBERNETES_DEPLOYMENT') else os.environ.get('SECRET_KEY', 'super-secret-key')
@@ -29,4 +31,4 @@ class Config:
     GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
     # This redirect URI must be registered in your Google Cloud Console for the OAuth 2.0 client ID
     # For local development, it might be http://localhost:5000/api/auth/google-callback
-    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5000/api/auth/google-callback')
+    GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', f'http://{REVERSE_PROXY}/api/auth/google-callback')

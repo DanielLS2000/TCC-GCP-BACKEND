@@ -3,7 +3,7 @@ from flask_jwt_extended import JWTManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from config import Config
-from auth.utils import reset_db
+from auth.utils import reset_db, init_db
 from werkzeug.exceptions import BadRequest
 from authlib.integrations.flask_client import OAuth
 
@@ -69,7 +69,7 @@ def create_app(config_overrides=None):
         else:
             print("Attempting to create database tables if they don't exist...") # NOVO LOG
             try:
-                db.create_all() # Isso cria tabelas se elas não existirem. Não apaga dados.
+                init_db(db=db)
                 print("Database tables created successfully or already exist.") # NOVO LOG
             except Exception as e:
                 print(f"ERROR: Failed to create database tables: {e}") # NOVO LOG DE ERRO

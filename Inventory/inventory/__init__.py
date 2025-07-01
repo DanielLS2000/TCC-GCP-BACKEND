@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
-from app.database import reset_db
+from inventory.database import reset_db, init_db
 
 db = SQLAlchemy()
 jwt = JWTManager()
@@ -44,23 +44,23 @@ def create_app(config_overrides=None):
         else:
             print("Attempting to create database tables if they don't exist...")
             try:
-                db.create_all()
+                init_db(db=db)
                 print("Database tables created successfully or already exist.")
             except Exception as e:
                 print(f"ERROR: Failed to create database tables: {e}")
 
     # Importar e registrar Blueprints
-    from app.routes.product_routes import product_bp
-    from app.routes.category_routes import category_bp
-    from app.routes.stock_routes import stock_bp
-    from app.routes.inventory_routes import inventory_bp
+    from inventory.routes.product_routes import product_bp
+    from inventory.routes.category_routes import category_bp
+    from inventory.routes.stock_routes import stock_bp
+    from inventory.routes.inventory_routes import inventory_bp
 
     app.register_blueprint(product_bp, url_prefix='/api/inventory/products')
     app.register_blueprint(category_bp, url_prefix='/api/inventory/categories')
     app.register_blueprint(stock_bp, url_prefix='/api/inventory/stock')
     app.register_blueprint(inventory_bp, url_prefix='/api/inventory/locations')
 
-    from app.routes.health_routes import health_bp
+    from inventory.routes.health_routes import health_bp
     app.register_blueprint(health_bp)
 
     return app

@@ -1,5 +1,5 @@
 def reset_db(db):
-    from app.models import SaleOrder, SaleItem
+    from customer.models import Customer
     
     print("Resetando o banco de dados...")
     db.drop_all()

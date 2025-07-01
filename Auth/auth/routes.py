@@ -3,7 +3,9 @@ from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
     jwt_required,
-    get_jwt_identity
+    get_jwt_identity,
+    set_access_cookies,
+    set_refresh_cookies
 )
 from auth.models import User
 from auth import db, oauth
@@ -41,62 +43,66 @@ def login():
     
     return jsonify(
         access_token=access_token,
-        refresh_token=refresh_token
+        refresh_token=refresh_token,
+        name=str(user)
     ), 200
 
 @auth_bp.route('/google-login', methods=['GET'])
 def google_login():
     """Initiates the Google OAuth login flow."""
-    # current_app.config['GOOGLE_REDIRECT_URI'] is retrieved from config
     redirect_uri = current_app.config['GOOGLE_REDIRECT_URI']
     return oauth.google.authorize_redirect(redirect_uri)
 
 @auth_bp.route('/google-callback', methods=['GET'])
 def google_callback():
-    """Handles the callback from Google OAuth."""
+    """Lida com o retorno de chamada do OAuth do Google."""
     try:
         token = oauth.google.authorize_access_token()
-        userinfo = oauth.google.parse_id_token(token) # Get user info from ID token
+        userinfo = oauth.google.parse_id_token(token)
         
         google_email = userinfo['email']
         google_name = userinfo.get('name', google_email.split('@')[0])
-        google_sub = userinfo['sub'] # Google's unique user ID
+        google_sub = userinfo['sub']
 
         user = User.query.filter_by(email=google_email).first()
 
         if not user:
-            # User does not exist, create a new one
+            # Usuário não existe, cria um novo
             new_user = User(
-                username=google_name, # Use Google name or part of email as username
+                username=google_name,
                 email=google_email,
-                role='user' # Default role
+                role='user'
             )
-            # You might want a way to distinguish SSO users from password users,
-            # e.g., setting a dummy password or leaving password_hash null if allowed,
-            # or adding a 'sso_provider' field. For simplicity, we'll set a placeholder.
-            new_user.set_password("SSO_GOOGLE_USER_PASSWORD_PLACEHOLDER") # Or handle differently
+            new_user.set_password("SSO_GOOGLE_USER_PASSWORD_PLACEHOLDER")
             db.session.add(new_user)
             db.session.commit()
             db.session.refresh(new_user)
             user = new_user
         
-        # Generate your application's JWTs
+        # Gerando os JWTs
         access_token = create_access_token(identity=user.email)
         refresh_token = create_refresh_token(identity=user.email)
         
-        # Redirect to frontend with tokens (or a success page)
-        # It's generally safer to redirect to a frontend route and pass tokens in query params
-        # or use local storage (less secure, but common for SPAs).
-        # For simplicity, we'll redirect with tokens as query parameters.
-        # In a real application, you might redirect to a specific success page or handle
-        # the token transfer more securely.
-        frontend_redirect_url = f"http://localhost:4200/login-success?access_token={access_token}&refresh_token={refresh_token}&user_id={user.id}&user_name={user.username}"
-        return redirect(frontend_redirect_url)
+        from config import Config
+        frontend_base_url = f"http://{Config.FRONTEND_HOST}"
+        
+        # Cria um objeto de resposta de redirecionamento
+        response = redirect(frontend_base_url)
+
+        # Define os JWTs como cookies HttpOnly na resposta de redirecionamento
+        # flask_jwt_extended configura automaticamente as opções de cookie HttpOnly e Secure (se estiver em HTTPS)
+        set_access_cookies(response, access_token)
+        set_refresh_cookies(response, refresh_token)
+        
+        return response
 
     except Exception as e:
         db.session.rollback()
         print(f"Google OAuth callback error: {e}")
-        return jsonify({"msg": f"Google authentication failed: {e}"}), 400
+        # Em caso de erro, redirecione de volta para a página de login do frontend com um indicador de erro
+        from config import Config
+        error_redirect_url = f"http://{Config.FRONTEND_HOST}/login?error=oauth_failed"
+        return redirect(error_redirect_url)
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
@@ -138,7 +144,7 @@ def register():
     except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
-    username = data.get('username')
+    username = data.get('name')
     email = data.get('email')
     password = data.get('password')
     role = data.get('role', 'user') # Default 'user'
@@ -146,14 +152,10 @@ def register():
     # Verificação de campos obrigatórios
     if not username or not email or not password:
         missing_fields = []
-        if not username: missing_fields.append('username')
+        if not username: missing_fields.append('name')
         if not email: missing_fields.append('email')
         if not password: missing_fields.append('password')
         return jsonify({"msg": f"Missing required fields: {', '.join(missing_fields)}"}), 400
-
-    # Verificação de exemplo para força da senha
-    if len(password) < 5:
-        return jsonify({"details": {"password": "Password is too weak"}}), 422
 
     # Conflito: Usuário já existe
     if User.query.filter_by(email=email).first() is not None:

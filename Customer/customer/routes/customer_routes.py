@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, Response, url_for
-from app.models import Customer
-from app import db
+from customer.models import Customer
+from customer import db
 from flask_jwt_extended import jwt_required 
 
 customer_bp = Blueprint('customer', __name__)

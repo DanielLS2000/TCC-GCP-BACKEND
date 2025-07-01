@@ -1,4 +1,4 @@
-from app import db
+from customer import db
 
 class Customer(db.Model):
     __tablename__ = 'customer'

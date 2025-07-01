@@ -8,4 +8,4 @@ def health_check():
 
 @health_bp.route('/', methods=['GET'])
 def root_check():
-    return jsonify({"message": "Auth Service Root"}), 200
+    return jsonify({"message": "Customer Service Root"}), 200
