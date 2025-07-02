@@ -52,12 +52,15 @@ class Product(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey("category.id", ondelete="SET NULL"), nullable=True)
     category_details = db.Column(db.String, nullable=True)
     product_image = db.Column(db.String, nullable = True)
+    category = db.Column(db.String, nullable = True)
+    quantity = db.Column(db.Integer, nullable = True)
 
     def __repr__(self):
         return f'<Name {self.name}>'
     
     
     def to_dict(self):
+        profit = self.sell_price - self.buy_price
         return {
             'id': self.id,
             'name': self.name,
@@ -66,7 +69,12 @@ class Product(db.Model):
             'sell_price': self.sell_price,
             'category_id': self.category_id,
             'category_details': self.category_details,
-            'product_image': self.product_image
+            'product_image': self.product_image,
+            'profit': profit,
+            'category': self.category,
+            'quantity': self.quantity,
+            'code': self.id,
+            'price': self.sell_price
         }
     
 

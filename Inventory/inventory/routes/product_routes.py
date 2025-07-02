@@ -30,6 +30,11 @@ def create_product():
     print("Dados recebidos:", data)
     name = data.get("name")
     buy_price = data.get("price")
+    profit = data.get("profit")
+    sell_price = None
+    if profit:
+        sell_price = profit + buy_price
+    quantity = data.get("quantity")
 
     if not name or buy_price is None:
         return jsonify({"msg": "Dados insuficientes (name, buy_price são obrigatórios)."}), 422
@@ -39,13 +44,16 @@ def create_product():
         category = db.session.get(Category, category_id)
         if not category:
             return jsonify({"msg": "Categoria não encontrada"}), 404
+        
+    category = data.get('category')
+    if not category:
+        return jsonify({"msg": "Categoria não encontrada"}), 404
 
     product_image_url = None
     if 'image' in request.files:
         image_file = request.files['image']
         if image_file.filename != '':
             # Generate a unique filename for GCS
-            # Use secure_filename to clean the original filename, but prepend a UUID or timestamp
             import uuid
             unique_filename = f"{uuid.uuid4()}_{secure_filename(image_file.filename)}"
             
@@ -56,12 +64,8 @@ def create_product():
                 
                 # Upload the file
                 blob.upload_from_file(image_file, content_type=image_file.content_type)
-                
-                # Make the blob publicly accessible if desired (for direct serving)
-                # Alternatively, use signed URLs for private access control
-                # blob.make_public() # Consider if truly needed, usually signed URLs or CDN is better
 
-                product_image_url = blob.public_url # Or blob.media_link, depending on access setup
+                product_image_url = blob.public_url
 
             except Exception as e:
                 return jsonify({"error": f"Falha ao fazer upload da imagem para GCS: {str(e)}"}), 500
@@ -71,10 +75,12 @@ def create_product():
         name=name,
         buy_price=buy_price,
         desc=data.get('desc'),
-        sell_price=data.get('sell_price'),
+        sell_price=sell_price,
         category_id=category_id,
         category_details=data.get('category_details'),
-        product_image=product_image_url # Store the GCS URL
+        product_image=product_image_url, # Store the GCS Public URL
+        category=category,
+        quantity=quantity
     )
 
     try:
@@ -119,6 +125,16 @@ def get_product_by_id(product_id: int):
 @product_bp.route('/<int:product_id>', methods=['PUT'])
 @jwt_required()
 def update_product_by_id(product_id: int):
+    if 'product' not in request.files:
+        return jsonify({"msg": "O campo 'product' (enviado como Blob/file) é obrigatório."}), 400
+
+    try:
+        product_file = request.files['product']
+        product_json_string = product_file.read().decode('utf-8')
+        data = json.loads(product_json_string)
+    except Exception as e:
+        return jsonify({"msg": "Erro ao processar o JSON do produto.", "details_dev": str(e)}), 400
+    
     try:
         product = db.session.get(Product, product_id)
     except Exception as e:
@@ -132,6 +148,19 @@ def update_product_by_id(product_id: int):
     if 'image' in request.files:
         image_file = request.files['image']
         if image_file.filename != '':
+            # Se uma nova imagem é enviada, delete a antiga primeiro
+            if product.product_image and storage_client:
+                try:
+                    bucket_name = current_app.config['GCS_BUCKET_NAME']
+                    bucket = storage_client.bucket(bucket_name)
+                    # Extrai o nome do blob da URL pública para deletar
+                    old_blob_name = os.path.basename(product.product_image)
+                    old_blob = bucket.blob(old_blob_name)
+                    if old_blob.exists():
+                        old_blob.delete()
+                except Exception as e:
+                    print(f"Warning: Falha ao deletar imagem antiga do GCS durante atualização: {e}")
+
             import uuid
             unique_filename = f"{uuid.uuid4()}_{secure_filename(image_file.filename)}"
             try:
@@ -139,32 +168,29 @@ def update_product_by_id(product_id: int):
                 bucket = storage_client.bucket(bucket_name)
                 blob = bucket.blob(unique_filename)
                 blob.upload_from_file(image_file, content_type=image_file.content_type)
-                # blob.make_public() # Uncomment if public access is desired
-                product_image_url = blob.public_url
+                product_image_url = blob.public_url # Armazena a nova URL pública
             except Exception as e:
                 return jsonify({"error": f"Falha ao fazer upload da imagem atualizada para GCS: {str(e)}"}), 500
     elif 'product_image' in data and data.get('product_image') is None:
-        # If product_image is explicitly set to null, delete the old one from GCS
-        if product.product_image:
+        # Se 'product_image' for explicitamente definido como null no JSON, deleta a imagem antiga do GCS
+        if product.product_image and storage_client:
             try:
                 bucket_name = current_app.config['GCS_BUCKET_NAME']
                 bucket = storage_client.bucket(bucket_name)
-                # Extract blob name from URL (simple example, may need robust parsing)
-                blob_name = os.path.basename(product.product_image)
-                blob = bucket.blob(blob_name)
-                blob.delete()
-                product_image_url = None # Set to None after deletion
+                old_blob_name = os.path.basename(product.product_image) # Extrai o nome do blob
+                blob = bucket.blob(old_blob_name)
+                if blob.exists():
+                    blob.delete()
+                product_image_url = None # Define a URL como None após a deleção
             except Exception as e:
-                print(f"Warning: Failed to delete old image from GCS: {e}") # Log, but don't fail update
-                product_image_url = None # Ensure URL is cleared even if delete fails
-
-    try:
-        data = request.get_json()
-    except Exception as e:
-        return jsonify({"msg": "Request body is missing or not JSON"}), 400
+                print(f"Warning: Falha ao deletar imagem antiga do GCS: {e}")
+                product_image_url = None
 
     name = data.get("name")
-    buy_price = data.get("buy_price")
+    buy_price = data.get("price")
+    profit = data.get("profit")
+    if profit:
+        data["sell_price"] = profit + buy_price
 
     if 'name' in data and not name:
         return jsonify({"msg": "Invalid data for update.", "details": {"name": "Name cannot be empty if provided."}}), 422
@@ -179,13 +205,14 @@ def update_product_by_id(product_id: int):
     
     # Atualizando os campos do produto
     product.name = data.get('name', product.name)
-    product.buy_price = data.get('buy_price', product.buy_price)
+    product.buy_price = data.get('price', product.buy_price)
     product.desc = data.get('desc', product.desc)
     product.sell_price = data.get('sell_price', product.sell_price)
+    product.category = data.get('category', product.category)
+    product.quantity = data.get('quantity', product.quantity)
     if "category_id" in data:
         product.category_id = category_id
     product.category_details = data.get('category_details', product.category_details)
-    # Use the new product_image_url if an image was uploaded/deleted, otherwise keep existing
     product.product_image = product_image_url
 
 
@@ -249,3 +276,26 @@ def search_products_by_name():
         return jsonify([product.to_dict() for product in products]), 200
     except Exception as e:
         return jsonify({"error": "An internal server error occurred during product search", "details_dev": str(e)}), 500
+    
+
+def _generate_signed_url_for_blob(blob_name):
+    """Generates a signed URL for a given GCS blob name."""
+    if not storage_client: # Ensure storage_client is initialized
+        print("Storage client not initialized. Cannot generate signed URL.")
+        return "Storage client not initialized. Cannot generate signed URL."
+    try:
+        bucket_name = current_app.config['GCS_BUCKET_NAME']
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        # Ensure the blob actually exists before trying to sign a URL for it
+        if not blob.exists():
+            print(f"Blob '{blob_name}' not found in bucket '{bucket_name}'.")
+            return f"Blob '{blob_name}' not found in bucket '{bucket_name}'."
+
+        # Generate a signed URL valid for 1 hour (3600 seconds)
+        signed_url = blob.generate_signed_url(expiration=3600)
+        return signed_url
+    except Exception as e:
+        print(f"Error generating signed URL for blob '{blob_name}': {e}")
+        return f"Error generating signed URL for blob '{blob_name}': {e}"
