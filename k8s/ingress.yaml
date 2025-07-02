@@ -3,13 +3,13 @@ kind: Ingress
 metadata:
   name: api-ingress # Um nome para o Ingress de todas as APIs
   annotations:
-    kubernetes.io/ingress.global-static-ip-name: tcc-erp.zapto.org
+    # kubernetes.io/ingress.global-static-ip-name: tcc-erp.zapto.org
     kubernetes.io/ingress.class: gce
-    networking.gke.io/managed-certificates: tcc-certificate
+    # networking.gke.io/managed-certificates: tcc-certificate
 spec:
   rules:
-  - host: tcc-erp.zapto.org
-    http:
+  # - host: tcc-erp.zapto.org
+  - http:
       paths:
         - path: /api/auth
           pathType: Prefix
@@ -46,6 +46,6 @@ spec:
               name: hr-service
               port:
                 number: 5000
-  tls:
-  - hosts:
-    - tcc-erp.zapto.org
+  # tls:
+  # - hosts:
+  #   - tcc-erp.zapto.org

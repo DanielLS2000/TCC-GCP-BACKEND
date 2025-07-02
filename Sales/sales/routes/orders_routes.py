@@ -26,6 +26,9 @@ def get_sales():
             # Carregar itens para cada venda
             items = SaleItem.query.filter_by(sale_order_id=order.id).all()
             order_dict['items'] = [item.to_dict() for item in items]
+            order_dict['client_name'] = "Cliente Desconhecido"  # Placeholder
+            order_dict['employee_name'] = "Funcionário Desconhecido"  # Placeholder
+            order_dict['total'] = sum(item.price * item.quantity for item in items)
             orders_data.append(order_dict)
         return jsonify(orders_data), 200
     except Exception as e:
@@ -136,6 +139,9 @@ def get_sale_by_id(sale_id: int):
         sale_dict = sale.to_dict()
         items = SaleItem.query.filter_by(sale_order_id=sale.id).all()
         sale_dict['items'] = [item.to_dict() for item in items]
+        sale_dict['client_name'] = "Cliente Desconhecido"  # Placeholder
+        sale_dict['employee_name'] = "Funcionário Desconhecido"  # Placeholder
+        sale_dict['total'] = sum(item.price * item.quantity for item in items)
         return jsonify(sale_dict), 200
     else:
         return jsonify({"msg": "Sale not found"}), 404
