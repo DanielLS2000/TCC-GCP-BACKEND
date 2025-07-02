@@ -1,10 +1,18 @@
+import json
 from flask import Blueprint, request, jsonify, Response, url_for
 from datetime import datetime
 from sales.models import SaleOrder, SaleItem
 from sales import db
 from flask_jwt_extended import jwt_required
+from google.cloud import pubsub_v1
+import os
 
 sale_orders_bp = Blueprint('saleorders', __name__)
+
+publisher = pubsub_v1.PublisherClient()
+PROJECT_ID = os.environ.get('GCP_PROJECT_ID')
+TOPIC_NAME = 'inventory-updates'
+TOPIC_PATH = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
 
 @sale_orders_bp.route('/', methods=["GET"])
@@ -18,15 +26,11 @@ def get_sales():
             # Carregar itens para cada venda
             items = SaleItem.query.filter_by(sale_order_id=order.id).all()
             order_dict['items'] = [item.to_dict() for item in items]
-            order_dict['employee_name'] = "Default"
-            order_dict['client_name'] = "Default"
-            order_dict['total'] = 0
             orders_data.append(order_dict)
         return jsonify(orders_data), 200
     except Exception as e:
         return jsonify({"error": "An internal server error occurred", "details_dev": str(e)}), 500
 
-# Refazer função
 @sale_orders_bp.route('/', methods=["POST"])
 @jwt_required()
 def create_sale():
@@ -35,7 +39,6 @@ def create_sale():
     except Exception as e:
         return jsonify({"msg": "Request body is missing or not JSON"}), 400
 
-    # Requer client_id, employee_id, items.
     client_id = data.get("client_id")
     employee_id = data.get("employee_id")
     items_payload = data.get("items")
@@ -56,7 +59,6 @@ def create_sale():
         price = item_data.get('price')
 
         if product_id is None or quantity is None or price is None:
-            # Requer product_id, quantity, price
             return jsonify({"msg": "Product ID, quantity, and price are required for each item"}), 422
         
         if not isinstance(quantity, int) or quantity <= 0:
@@ -78,12 +80,13 @@ def create_sale():
         payment_method=data.get('payment_method'),
         status=data.get('status', 'PENDING')
     )
-
+    estado = ''
     try:
+        estado ='antes de criar a sale'
         db.session.add(new_sale)
-        db.session.commit() 
+        db.session.commit() # Commit the sale order to get its ID
         db.session.refresh(new_sale)
-
+        estado = 'depois de criar e commitar a sale order'
         for item_data_dict in sale_items_to_create:
             sale_item = SaleItem(
                 sale_order_id=new_sale.id, 
@@ -93,20 +96,33 @@ def create_sale():
                 discount=item_data_dict['discount']
             )
             db.session.add(sale_item)
-        db.session.commit() 
-        
+            estado= 'depois de adicionar 1 item ao db'
+            # --- Publicar mensagem no Pub/Sub para atualização de inventário ---
+            message_data = {
+                "product_id": item_data_dict['product_id'],
+                "quantity_sold": item_data_dict['quantity']
+            }
+            future = publisher.publish(TOPIC_PATH, json.dumps(message_data).encode('utf-8'))
+            # A operação é assíncrona, não esperamos pelo resultado aqui.
+            print(f"Published message for product {item_data_dict['product_id']}. Message ID: {future.result()}")
+            estado = 'depois de publicar um item no pub/sub'
+        estado = 'antes de comitar a sessão'
+        db.session.commit() # Commit all sale items to the database
+        estado = 'era pra funcionar'
+
+        # Prepare the response with the created sale and its items
         created_sale_dict = new_sale.to_dict()
         items_created = SaleItem.query.filter_by(sale_order_id=new_sale.id).all()
         created_sale_dict['items'] = [item.to_dict() for item in items_created]
 
         location_uri = url_for('saleorders.get_sale_by_id', sale_id=new_sale.id, _external=True)
-
-        return jsonify(created_sale_dict), 201, {'Location': location_uri}
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Failed to save sale to database", "details_dev": str(e)}), 500
+        return jsonify({"error": "Failed to save sale to database", "details_dev": str(e), "estado": estado}), 500
     finally:
-        db.session.close()
+        db.session.close() # Close the database session after all operations
+
+    return jsonify(created_sale_dict), 201, {'Location': location_uri}
 
 @sale_orders_bp.route('/<int:sale_id>', methods=["GET"])
 @jwt_required()
@@ -124,7 +140,6 @@ def get_sale_by_id(sale_id: int):
     else:
         return jsonify({"msg": "Sale not found"}), 404
 
-# Refazer função
 @sale_orders_bp.route('/<int:sale_id>', methods=["PUT"])
 @jwt_required()
 def update_sale_by_id(sale_id: int):
@@ -147,41 +162,37 @@ def update_sale_by_id(sale_id: int):
     sale.date = data.get("date", sale.date)
     sale.payment_method = data.get("payment_method", sale.payment_method)
     sale.status = data.get("status", sale.status)
-    # TODO: Se client_id ou employee_id forem alterados, VALIDAR sua existência via comunicação entre serviços.
 
     items_payload = data.get("items")
     if items_payload is not None: 
         if not isinstance(items_payload, list): 
              return jsonify({"msg": "Items must be a list if provided"}), 422
 
-        # Remover itens antigos e adicionar novos
         try:
-            SaleItem.query.filter_by(sale_order_id=sale.id).delete() #
+            SaleItem.query.filter_by(sale_order_id=sale.id).delete()
             sale_items_to_update = []
             for item_data in items_payload:
-                if not isinstance(item_data, dict): #
-                    return jsonify({"msg": "Invalid item format in items list"}), 400 #
+                if not isinstance(item_data, dict):
+                    return jsonify({"msg": "Invalid item format in items list"}), 400
                 
                 product_id = item_data.get('product_id')
                 quantity = item_data.get('quantity')
                 price = item_data.get('price')
 
-                if product_id is None or quantity is None or price is None: #
-                    return jsonify({"msg": "Product ID, quantity, and price are required for each new item"}), 422 #
+                if product_id is None or quantity is None or price is None:
+                    return jsonify({"msg": "Product ID, quantity, and price are required for each new item"}), 422
 
                 if not isinstance(quantity, int) or quantity <= 0:
                     return jsonify({"msg": "Item quantity must be a positive integer", "details": {"product_id": product_id}}), 422
                 if not isinstance(price, (int, float)) or price < 0:
                     return jsonify({"msg": "Item price must be a non-negative number", "details": {"product_id": product_id}}), 422
-                
-                # TODO: VALIDAR product_id: Fazer chamada ao microsserviço de Product.
 
                 sale_items_to_update.append(SaleItem(
                     sale_order_id=sale.id,
                     product_id=product_id,
                     quantity=quantity,
                     price=price,
-                    discount=item_data.get('discount', 0.0) #
+                    discount=item_data.get('discount', 0.0)
                 ))
             if sale_items_to_update:
                 db.session.add_all(sale_items_to_update)
@@ -194,7 +205,7 @@ def update_sale_by_id(sale_id: int):
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": "Failed to update sale items", "details_dev": str(e)}), 500
-    else: # Nenhum item no payload, apenas atualiza os campos da venda.
+    else: 
         try:
             db.session.commit()
             updated_sale_dict = sale.to_dict()
@@ -219,8 +230,8 @@ def delete_sale_by_id(sale_id: int):
         return jsonify({"msg": "Sale not found"}), 404
     
     try:
-        SaleItem.query.filter_by(sale_order_id=sale.id).delete() #
-        db.session.delete(sale) #
+        SaleItem.query.filter_by(sale_order_id=sale.id).delete()
+        db.session.delete(sale)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

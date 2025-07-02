@@ -54,11 +54,13 @@ def create_app(config_overrides=None):
     from inventory.routes.category_routes import category_bp
     from inventory.routes.stock_routes import stock_bp
     from inventory.routes.inventory_routes import inventory_bp
+    from inventory.routes.pubsub_handles import pubsub_bp
 
     app.register_blueprint(product_bp, url_prefix='/api/inventory/products')
     app.register_blueprint(category_bp, url_prefix='/api/inventory/categories')
     app.register_blueprint(stock_bp, url_prefix='/api/inventory/stock')
     app.register_blueprint(inventory_bp, url_prefix='/api/inventory/locations')
+    app.register_blueprint(pubsub_bp, url_prefix='/api/inventory/pubsub')
 
     from inventory.routes.health_routes import health_bp
     app.register_blueprint(health_bp)

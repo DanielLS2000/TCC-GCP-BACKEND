@@ -1,0 +1,7 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: tcc-certificate
+spec:
+  domains:
+    - tcc-erp.zapto.org
