@@ -18,6 +18,9 @@ def get_sales():
             # Carregar itens para cada venda
             items = SaleItem.query.filter_by(sale_order_id=order.id).all()
             order_dict['items'] = [item.to_dict() for item in items]
+            order_dict['employee_name'] = "Default"
+            order_dict['client_name'] = "Default"
+            order_dict['total'] = 0
             orders_data.append(order_dict)
         return jsonify(orders_data), 200
     except Exception as e:
@@ -39,11 +42,6 @@ def create_sale():
 
     if client_id is None or employee_id is None:
         return jsonify({"msg": "Client ID and Employee ID are required"}), 422
-    
-    # TODO: VALIDAR client_id: Fazer chamada ao microsserviço de Customer para verificar se client_id existe.
-    #       Se não existir, retornar: jsonify({"msg": "Client not found"}), 404 (ou 422 se preferir para input inválido)
-    # TODO: VALIDAR employee_id: Fazer chamada ao microsserviço de Employee para verificar se employee_id existe.
-    #       Se não existir, retornar: jsonify({"msg": "Employee not found"}), 404 (ou 422)
 
     if not items_payload or not isinstance(items_payload, list) or len(items_payload) < 1:
         return jsonify({"msg": "Items are required and must be a non-empty list"}), 422
@@ -65,9 +63,6 @@ def create_sale():
             return jsonify({"msg": "Item quantity must be a positive integer", "details": {"product_id": product_id}}), 422
         if not isinstance(price, (int, float)) or price < 0:
             return jsonify({"msg": "Item price must be a non-negative number", "details": {"product_id": product_id}}), 422
-            
-        # TODO: VALIDAR product_id: Fazer chamada ao microsserviço de Product para verificar se product_id existe E se há estoque suficiente.
-        #       Se não existir, retornar: jsonify({"msg": f"Product with ID {product_id} not found or insufficient stock"}), 404 (ou 422)
 
         sale_items_to_create.append({
             "product_id": product_id,
@@ -99,19 +94,19 @@ def create_sale():
             )
             db.session.add(sale_item)
         db.session.commit() 
+        
+        created_sale_dict = new_sale.to_dict()
+        items_created = SaleItem.query.filter_by(sale_order_id=new_sale.id).all()
+        created_sale_dict['items'] = [item.to_dict() for item in items_created]
+
+        location_uri = url_for('saleorders.get_sale_by_id', sale_id=new_sale.id, _external=True)
+
+        return jsonify(created_sale_dict), 201, {'Location': location_uri}
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to save sale to database", "details_dev": str(e)}), 500
     finally:
         db.session.close()
-    
-    created_sale_dict = new_sale.to_dict()
-    items_created = SaleItem.query.filter_by(sale_order_id=new_sale.id).all()
-    created_sale_dict['items'] = [item.to_dict() for item in items_created]
-
-    location_uri = url_for('saleorders.get_sale_by_id', sale_id=new_sale.id, _external=True)
-
-    return jsonify(created_sale_dict), 201, {'Location': location_uri}
 
 @sale_orders_bp.route('/<int:sale_id>', methods=["GET"])
 @jwt_required()
