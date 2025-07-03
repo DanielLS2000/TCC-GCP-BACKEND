@@ -1,5 +1,6 @@
 import json
-from flask import Blueprint, request, jsonify, Response, url_for
+from flask import Blueprint, request, jsonify, Response, url_for, current_app
+import uuid
 from datetime import datetime
 from sales.models import SaleOrder, SaleItem
 from sales import db
@@ -13,6 +14,9 @@ publisher = pubsub_v1.PublisherClient()
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID')
 TOPIC_NAME = 'inventory-updates'
 TOPIC_PATH = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
+
+INVOICE_TOPIC_NAME = 'sale-invoice-events'
+INVOICE_TOPIC_PATH = publisher.topic_path(PROJECT_ID, INVOICE_TOPIC_NAME)
 
 
 @sale_orders_bp.route('/', methods=["GET"])
@@ -83,13 +87,14 @@ def create_sale():
         payment_method=data.get('payment_method'),
         status=data.get('status', 'PENDING')
     )
-    estado = ''
     try:
-        estado ='antes de criar a sale'
         db.session.add(new_sale)
         db.session.commit() # Commit the sale order to get its ID
         db.session.refresh(new_sale)
-        estado = 'depois de criar e commitar a sale order'
+
+        total_sale_value = 0.0
+        invoice_items = []
+
         for item_data_dict in sale_items_to_create:
             sale_item = SaleItem(
                 sale_order_id=new_sale.id, 
@@ -99,7 +104,6 @@ def create_sale():
                 discount=item_data_dict['discount']
             )
             db.session.add(sale_item)
-            estado= 'depois de adicionar 1 item ao db'
             # --- Publicar mensagem no Pub/Sub para atualização de inventário ---
             message_data = {
                 "product_id": item_data_dict['product_id'],
@@ -107,21 +111,49 @@ def create_sale():
             }
             future = publisher.publish(TOPIC_PATH, json.dumps(message_data).encode('utf-8'))
             # A operação é assíncrona, não esperamos pelo resultado aqui.
-            print(f"Published message for product {item_data_dict['product_id']}. Message ID: {future.result()}")
-            estado = 'depois de publicar um item no pub/sub'
-        estado = 'antes de comitar a sessão'
-        db.session.commit() # Commit all sale items to the database
-        estado = 'era pra funcionar'
+            current_app.logger.info(f"Published message for product {item_data_dict['product_id']}. Message ID: {future.result()}")
+            
+            # Calculo para Nota Fiscal
+            item_total = (item_data_dict['quantity'] * item_data_dict['price']) - item_data_dict['discount']
+            total_sale_value += item_total
+            invoice_items.append({
+                "product_id": item_data_dict['product_id'],
+                "quantity": item_data_dict['quantity'],
+                "unit_price": item_data_dict['price'],
+                "discount": item_data_dict['discount'],
+                "total_item_price": item_total
+            })
 
+        db.session.commit() # Commit all sale items to the database
+        
         # Prepare the response with the created sale and its items
         created_sale_dict = new_sale.to_dict()
         items_created = SaleItem.query.filter_by(sale_order_id=new_sale.id).all()
         created_sale_dict['items'] = [item.to_dict() for item in items_created]
 
+        invoice_data = {
+            "nf_id": str(uuid.uuid4()), # Unique invoice identifier
+            "sale_order_id": new_sale.id,
+            "issue_date": datetime.now().isoformat(),
+            "client_id": new_sale.client_id,
+            "employee_id": new_sale.employee_id,
+            "payment_method": new_sale.payment_method,
+            "status": new_sale.status,
+            "total_value": total_sale_value,
+            "items": invoice_items,
+            "observacoes": "Nota Fiscal gerada automaticamente."
+        }
+        invoice_message_data = {
+            "sale_order": created_sale_dict,
+            "invoice_data": invoice_data
+        }
+        invoice_future = publisher.publish(INVOICE_TOPIC_PATH, json.dumps(invoice_message_data).encode('utf-8'))
+        current_app.logger.info(f"Published invoice generation message for Sale Order {new_sale.id}. Message ID: {invoice_future.result()}")
+
         location_uri = url_for('saleorders.get_sale_by_id', sale_id=new_sale.id, _external=True)
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Failed to save sale to database", "details_dev": str(e), "estado": estado}), 500
+        return jsonify({"error": "Failed to save sale to database", "details_dev": str(e)}), 500
     finally:
         db.session.close() # Close the database session after all operations
 
