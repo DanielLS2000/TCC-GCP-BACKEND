@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sales-deploy # Sugestão de nome: sales-deploy
+  name: sales-deploy
   labels:
     app: sales-service
 spec:
-  replicas: 1 # Comece com 1, aumente conforme a necessidade
+  replicas: 1 
   selector:
     matchLabels:
       app: sales-service
@@ -15,7 +15,7 @@ spec:
       labels:
         app: sales-service
     spec:
-      serviceAccountName: sales-sa # Nome da Service Account do Kubernetes criada
+      serviceAccountName: sales-sa 
       containers:
         - name: sales-api
           image: us-central1-docker.pkg.dev/key-hope-455618-p3/tcc-erp-repo/sales-service:latest
@@ -23,9 +23,9 @@ spec:
             - containerPort: 5000
           env:
             - name: KUBERNETES_DEPLOYMENT
-              value: "true" # Flag para ativar a leitura de secrets
+              value: "true" 
             - name: GCP_PROJECT_ID
-              value: "key-hope-455618-p3" # Necessário para o Secret Manager
+              value: "key-hope-455618-p3" 
           resources:
             requests:
               memory: "256Mi"

@@ -8,6 +8,7 @@ class Customer(db.Model):
     email = db.Column(db.String, nullable=False)
     phone = db.Column(db.String, nullable=False)
     address = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
 
     def __repr__(self):
         return f'<Name {self.name}>'
@@ -18,5 +19,6 @@ class Customer(db.Model):
             'name': self.name,
             'email': self.email,
             'phone': self.phone,
-            'address': self.address
+            'address': self.address,
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }

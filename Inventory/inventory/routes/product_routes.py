@@ -31,7 +31,7 @@ def create_product():
     name = data.get("name")
     buy_price = data.get("price")
     profit = data.get("profit")
-    sell_price = None
+    sell_price = 0
     if profit:
         sell_price = profit + buy_price
     quantity = data.get("quantity")
@@ -80,7 +80,8 @@ def create_product():
         category_details=data.get('category_details'),
         product_image=product_image_url, # Store the GCS Public URL
         category=category,
-        quantity=quantity
+        quantity=quantity,
+        minimum_stock=10 # Default minimum stock, can be adjusted later
     )
 
     try:

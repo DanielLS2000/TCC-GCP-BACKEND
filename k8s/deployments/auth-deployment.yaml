@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: auth-deploy # Sugestão de nome: auth-deploy
+  name: auth-deploy
   labels:
     app: auth-service
 spec:
-  replicas: 1 # Comece com 1, aumente conforme a necessidade
+  replicas: 1
   selector:
     matchLabels:
       app: auth-service
@@ -15,7 +15,7 @@ spec:
       labels:
         app: auth-service
     spec:
-      serviceAccountName: auth-sa # Nome da Service Account do Kubernetes criada
+      serviceAccountName: auth-sa
       containers:
         - name: auth-api
           image: us-central1-docker.pkg.dev/key-hope-455618-p3/tcc-erp-repo/auth-service:latest
@@ -23,12 +23,9 @@ spec:
             - containerPort: 5000
           env:
             - name: KUBERNETES_DEPLOYMENT
-              value: "true" # Flag para ativar a leitura de secrets
+              value: "true"
             - name: GCP_PROJECT_ID
-              value: "key-hope-455618-p3" # Necessário para o Secret Manager
-            # As variáveis SECRET_KEY, JWT_SECRET_KEY, DATABASE_URL serão lidas do Secret Manager
-            # via a função get_secret no seu código Flask, usando a Workload Identity.
-            # Não as coloque aqui explicitamente!
+              value: "key-hope-455618-p3"
           resources:
             requests:
               memory: "256Mi"

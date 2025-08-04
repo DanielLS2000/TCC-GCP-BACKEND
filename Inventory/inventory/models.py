@@ -54,6 +54,7 @@ class Product(db.Model):
     product_image = db.Column(db.String, nullable = True)
     category = db.Column(db.String, nullable = True)
     quantity = db.Column(db.Integer, nullable = True)
+    minimum_stock = db.Column(db.Integer, nullable = True)
 
     def __repr__(self):
         return f'<Name {self.name}>'
@@ -74,7 +75,8 @@ class Product(db.Model):
             'category': self.category,
             'quantity': self.quantity,
             'code': self.id,
-            'price': self.sell_price
+            'price': self.sell_price,
+            'minimum_stock': self.minimum_stock
         }
     
 
